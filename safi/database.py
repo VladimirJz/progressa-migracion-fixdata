@@ -1,6 +1,13 @@
 from decimal import Decimal
 from datetime import date
+
+SALDOS_DIARIOS='saldos_diarios'
+CLIENTES='clientes_detalle'
+LINEA='linea_credito'
+
 class Repository():
+    #Aliases
+
     Integracion=[
        {'routine':'PGSSALDOSREP',
         'keyword':'saldos_diarios',

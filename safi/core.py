@@ -31,12 +31,52 @@ logger = logging.getLogger(f"main.{__name__}")
 
 class Session():
     
-    '''
+    """ Gestiona la conexión con la Base de datos, proporcionado metodos de acceso simplificado.
+
+    Raises:
+        Exception.DBAutenticationError: Errores de autenticación de BD.
+        Exception.DataBaseError: Errores relacionados con la operación de BD
+
+
+    Returns:
+        cls: safi.core.Session
+    """    '''
     Gestiona la conexión con la base de datos  asi como la interacción con la misma
     '''
     REQUESTS_HEADER = {'Content-type': 'application/json'}
-    #service=service_stats()
-    
+
+    def _error_handler(self,err,object):
+        if err.errno == errorcode.ER_SP_DOES_NOT_EXIST:
+            message="La rutina especificada en la instancia <Request> no existe"
+            raise Exception.DataBaseError(object,message)
+                      
+        elif err.errno == errorcode.ER_SP_WRONG_NO_OF_ARGS:
+            message="El número de parametros de la rutina especificada, no coincide"
+            raise Exception.DataBaseError(object,message)
+            
+        elif err.errno == errorcode.ER_QUERY_INTERRUPTED:
+            message="CRITICAL: La ejecución de la rutina fue cancelada"
+            raise Exception.DataBaseError('MySQLConnection',message)
+            
+        
+        elif err.errno==errorcode.CR_CONN_HOST_ERROR:
+            message="CRITICAL: Imposible conectar con la Base de datos"
+            raise Exception.DataBaseError(object,message)
+        
+        elif err.errno == errorcode.ER_ACCESS_DENIED_ERROR: 
+            message="CRITICAL: Error de autenticación con la Base de datos"
+            raise Exception.DataBaseError(object,message)
+        
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
+            message="CRITICAL: La Base de datos no existe"
+            raise Exception.DataBaseError(object,message)
+
+
+
+        else:
+            raise Exception.DataBaseError(self.db_name,err)  
+            pass
+
     @property
     def db_name(self):
         return self._db_name
@@ -78,9 +118,13 @@ class Session():
     @db_strcon.setter
     def db_strcon(self,value):
         self._db_strcon=value
-    
 
-
+    @property
+    def db_uri(self):
+        return self._db_uri
+    @db_uri.setter
+    def db_uri(self,value):
+        self._db_uri=value
 
     @property
     def is_available(self):
@@ -92,12 +136,31 @@ class Session():
     # TODO: Renombrar el metodo get por un mas generico
     # la funcion ejecuta y lee el resultado.
 
-    def get(self,request,format='raw'):
-        '''
+    def get(self,request,output='raw'):
+        """ Ejecuta una instacia <safi.core.Request>
+
+        Args:
+            request (cls): Instancia safi.core.Request
+            output (str, optional): formato de salida. Defaults to 'raw'.
+
+        Returns:
+            dict/list: raw,json=dict{}  only_data= list[]
+        """        '''
         Obtiene de la base de datos la petición 'Safi.Request' y la devuelve en  el formato requerido
         Por default devuelve un objeto cursor.
         '''
-        def json_str(resulset):
+        def _format(resultset,output):
+            if output=='json':
+                return _json_str(resultset)
+        
+            if output=='onlydata':
+                return _only_data(resultset)
+                
+            if output=='raw':
+                    return _fetch_raw(resultset) 
+
+
+        def _json_str(resulset):
             data_json=[]
             for row in resulset:
                 json_str = json.dumps(row,cls=Generic.CustomJsonEncoder)
@@ -105,7 +168,7 @@ class Session():
             
             return data_json
 
-        def only_data(resultset):
+        def _only_data(resultset):
             '''
             Devuelve el resultset en formato de lista sin encabezados.
             '''
@@ -116,7 +179,7 @@ class Session():
             return data_no_headers
             pass
         
-        def fetch_raw(resultset):
+        def _fetch_raw(resultset):
             '''
             Devuelve el resultset en formato de lista sin encabezados.
             '''
@@ -131,39 +194,27 @@ class Session():
         print(type(request))
         #params=request.parameters
         
-        params=request.parameters
 
+        params=request.parameters
         audit=[ 1, 1, date.today(), '127.0.0.1', 'api.rest', 1, 1]
         #params.extend(audit)
-
         routine=request.routine
         print(routine)
         print(params)
+
         resultset=self._run(routine,params,request)
+        
         print(type(resultset))
         if(request.output=='message'):
             resultset=Utils.upper_keys(resultset)
         
         print(resultset)
-            
-        #request.rowcount=(len(resultset))
 
-        #print("AQUI")
-                
-        #print(type(resultset))
-        if format=='json':
-         #   print("JS")
-            return json_str(resultset)
-     
-        if format=='onlydata':
-          #  print("OD")
-            return only_data(resultset)
-            
-        if format=='raw':
-           #     print("RW")
-                return fetch_raw(resultset) 
-        raw_data=resultset
-        return raw_data
+        data=_format(resultset,output)
+        output=Output(data,request)    
+      
+        #raw_data=resultset
+        return output
 
 
         
@@ -254,13 +305,10 @@ class Session():
                 #print(rows)
                 #print('tupoCursor:',rows)
         except mysql.connector.Error as err:
-            print(err)
-            message="MySQL: On Execute ["+ routine + "] >" +str(err)    
-            logger.error(message)
+            self._error_handler(err,routine)
             return None
         else: 
-            message='MySQL:[' + routine  + '] executed sucessfully.'
-            logger.info(message)
+            pass
         return raw_data
 
 
@@ -285,18 +333,19 @@ class Session():
                 #print('try')
 
             except mysql.connector.Error as err:
-                if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-                    #message="MySQL: Authentication failed, wrong username or password"
-                    raise Exception.DBAutenticationError(self.db_user )
+                self._error_handler(err,self.db_uri)
+                # if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+                #     #message="MySQL: Authentication failed, wrong username or password"
+                #     raise Exception.DBAutenticationError(self.db_user )
                 
-                elif err.errno == errorcode.ER_BAD_DB_ERROR:
-                    message="La base de datos no existe"
-                    raise Exception.DataBaseError(self.db_name,message)
+                # elif err.errno == errorcode.ER_BAD_DB_ERROR:
+                #     message="La base de datos no existe"
+                #     raise Exception.DataBaseError(self.db_name,message)
                 
-                else:
-                    #message=err
-                    #logger.error(message)
-                    raise Exception.DataBaseError(self.db_name,err)
+                # else:
+                #     #message=err
+                #     #logger.error(message)
+                #     raise Exception.DataBaseError(self.db_name,err)
                     
         else:
             # The django manage the connection
@@ -382,9 +431,18 @@ class Connector(Session):
         self.db_pass=kwargs.pop('dbpassword')
         self.db_host=kwargs.pop('dbhost')
         self.db_port=kwargs.pop('dbport')
-        self.db_strcon=self._set_strconx()
+        self._set_URI()
+        #self.db_strcon=self._set_strconx()
+
         #print('_init_'+ str(self._testConnection()))
         self._is_available=self._testConnection()
+    def _set_URI(self):
+        self.db_uri=self.db_name + "//" + self.db_user + "@" + self.db_host +":"+ self.db_port
+        self.db_strcon=dict( user=self.db_user,
+                                    password=self.db_pass,
+                                    host=self.db_host,
+                                    database=self.db_name,
+                                    port=self.db_port)
 
     def connect(self):
         try:
@@ -427,11 +485,20 @@ class GenericRequest():
         self._routine=''
         self._keyword=keyword
         self._rowcount=0
-        self._status_code=None
+        self._code=None
         self._output=None
     
     def get_props(self,keyword, repository):
-        '''
+        """ Obtiene los propiedades de la petición <keyword> solicitada y actualiza las propiedades
+            de la instancia Request.
+
+        Args:
+            keyword (str): Nombre con el que se identifica la petición Request
+            repository (str): Nombre de la SubClase Request donde se obtiene <keyword>
+
+        Returns:
+            dict: Retorna un diccionario con las propiedades de la solicitud <Keyword>
+        """        '''
         Obtiene las propiedades de ejecucución del 'SAFI.Request' solicitado.
         '''
         return [element for element in repository if element['keyword'] == keyword]
@@ -469,11 +536,14 @@ class GenericRequest():
 
 
     def add(self,**kwargs):
-        '''
-        Agrega parametros al 'SAFI.Request' e inicializa con los valores default
-        aquellos que no son proporcionados explicitamente.
-        '''
-        #print(self)
+        """ 
+        Agrega paramametros a la instancia request, para contolar el comportamiento de la misma, 
+        sobre escribe los valores por default de cada parametro explicitamente asignado.
+        
+
+        Returns:
+            safi.core.Request: Instancia Request lista para ejecutar.
+        """
         raw_parameters=[]
         non_empty={k: v for k, v in kwargs.items() if v}
         print(self.properties[0])
@@ -498,24 +568,7 @@ class GenericRequest():
         #print (raw_parameters)
         return self
 
-    def add_org(self,**kwargs):
-        '''
-        Agrega parametros al 'SAFI.Request' e inicializa con los valores default
-        aquellos que no son proporcionados explicitamente.
-        '''
-        raw_parameters=[]
-        #print(self.properties)
-        unpack=self.properties[0]
-        self._routine=unpack['routine']
-        parameter_properties=unpack['parameters']
-        for par in parameter_properties:
-            #print(par['name'])
-            value= kwargs.get(par['name'],par['default'])
-            raw_parameters.append(value)
-        self._parameters= raw_parameters
-        #print('raw')
-        #print (raw_parameters)
-        return self
+   
 
     @property
     def keyword(self):
@@ -551,18 +604,18 @@ class GenericRequest():
     
     @property
     def status_code(self):
-        return self._status_code
+        return self._code
     @status_code.setter
     def status_code(self,value):
-        self._status_code=value
+        self._code=value
     
 
     @property
     def status_message(self):
-        return self._status_message
+        return self._message
     @status_message.setter
     def status_message(self,value):
-        self._status_message=value
+        self._message=value
 
 
     @property
@@ -874,6 +927,63 @@ class Utils:
         print(settings)
 
         return settings
+
+class Output():
+    def _update(self,db_output,request):
+        
+        self._rowcount=(len(db_output))
+        self._code=0
+        
+        if request.output=='message' and  self._rowcount==1 :
+            db_output=Utils.upper_keys(db_output) # byPass: mismatch case  for header titles.        
+
+        if self._rowcount>0:
+            self._message='Consulta realizada correctamente'
+        else:
+            #request.status_code=1
+            self._message='No Existen resultados.'
+   
+        if "NUMERR" in db_output[0]:
+            self._code=db_output[0]['NUMERR']
+            self._message=db_output[0]['ERRMEN']
+
+
+    @property
+    def status_code(self):
+        return self._code
+    @status_code.setter
+    def status_code(self,value):
+        self._code=value
+
+    @property
+    def status_message(self):
+        return self._message
+    @status_message.setter
+    def status_message(self,value):
+        self._message=value
+
+    @property
+    def rowcount(self):
+        return self._rowcount
+    @rowcount.setter
+    def rowcount(self,value):
+        self._rowcount=value
+ 
+    @property
+    def data(self):
+        return self._data
+    @data.setter
+    def data(self,value):
+        self._data=value
+    
+    def __init__(self,db_output,request):
+        self._data=db_output
+        self._update(request,db_output)
+
+            
+
+
+    
 ############################################################################
 ############################################################################
 #---------------------------------------------------------------------------
@@ -956,10 +1066,10 @@ class Exception(BaseException):
     
     class DataBaseError(Exception):
    
-        def __init__(self, value=None, *args):
+        def __init__(self, object=None, *args):
             super().__init__(args)
-            self.value = value
+            self.object = object
             self.message=args[0]
 
         def __str__(self):
-            return f" { self.message }:'{ self.value }'."
+            return f" { self.message }:'{ self.object }'."
