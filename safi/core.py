@@ -5,6 +5,7 @@ from distutils.log import debug
 from sre_constants import SUCCESS
 import mysql.connector
 from mysql.connector import errorcode
+
 #import sqlite3
 import json
 import configparser
@@ -191,7 +192,7 @@ class Session():
              #   print(a)
                 results.append(a)
             return results
-        print(type(request))
+        #print(type(request))
         #params=request.parameters
         
 
@@ -199,22 +200,17 @@ class Session():
         audit=[ 1, 1, date.today(), '127.0.0.1', 'api.rest', 1, 1]
         #params.extend(audit)
         routine=request.routine
-        print(routine)
-        print(params)
+        #print(routine)
+        #print(params)
 
         resultset=self._run(routine,params,request)
-        
-        print(type(resultset))
-        if(request.output=='message'):
-            resultset=Utils.upper_keys(resultset)
-        
-        print(resultset)
-
-        data=_format(resultset,output)
-        output=Output(data,request)    
+               
+        format_data=_format(resultset,output)
+        #print(format_data)
+        result=Output(format_data,request)    
       
         #raw_data=resultset
-        return output
+        return result
 
 
         
@@ -269,6 +265,7 @@ class Session():
         
     def _run(self,routine,params,request=None):
         '''Devuelve un objeto Cursor'''
+        raw_data={}
         def _todict( cursor):
             "Return all rows from a cursor as a dict"
 
@@ -286,22 +283,24 @@ class Session():
         try:
             #cursor.callproc(routine,params)
             #with db.cursor(dictionary=True) as cursor:
-            with db.cursor() as cursor:  
+           
+           with db.cursor(dictionary=True) as cursor:  
                 cursor.callproc(routine,params)
-                if(cursor.rowcount>0):                    
-                    raw_data = _todict(cursor)
-                    if(request):
-                        self._update_request(request,raw_data)
-                    #for result in cursor.stored_results():
-                        #print (result)
-                #    pass
-                else:
-                    raw_data=dict()
+                for results in cursor.stored_results():
+                    #print (raw_data)
+                    raw_data=results.fetchall()
+                    
+           # ORIGINAL
+            # with db.cursor() as cursor:  
+            #     cursor.callproc(routine,params)    
+            #     for result in cursor.stored_results():
+            #         raw_data=result
+            #         print(raw_data)
 
-            #db.commit()
 
-            return raw_data
+        #db.commit()
 
+                #raw_data=results.fetchall()
                 #print(rows)
                 #print('tupoCursor:',rows)
         except mysql.connector.Error as err:
@@ -473,12 +472,12 @@ class Connector(Session):
 ############################################################################
 ############################################################################
           
-class GenericRequest():
+class BaseRequest():
     '''
     Permite instanciar las peticiones a la BD como instancias de clase SAFI.Request en lugar de 
     usar directamente las rutinas de BD.
     '''
-    def __init__(self,keyword):
+    def __init__(self,keyword,repository=None):
         #print(repo)
         self._properties=''
         self._parameters=[]
@@ -487,6 +486,14 @@ class GenericRequest():
         self._rowcount=0
         self._code=None
         self._output=None
+        self._request=None
+        #self_name=__class__.__name__
+        self_name=self.__class__.__name__
+
+        if  not isinstance(self,Request.Generic):    
+            if(repository==None ):
+                repository=getattr(Repository, self_name) #The class name  must be equal to List  propertie
+            self.properties=self.get_props(keyword,repository)
     
     def get_props(self,keyword, repository):
         """ Obtiene los propiedades de la petición <keyword> solicitada y actualiza las propiedades
@@ -501,6 +508,8 @@ class GenericRequest():
         """        '''
         Obtiene las propiedades de ejecucución del 'SAFI.Request' solicitado.
         '''
+        #print(keyword)
+        #print(repository)
         return [element for element in repository if element['keyword'] == keyword]
     
     def add_bulk(self,**kwargs):
@@ -530,8 +539,8 @@ class GenericRequest():
         return ParsedRequest
     @classmethod    
     def new(cls,**add_args):
-        print(cls)
-        print(cls.routine)
+        #print(cls)
+        #print(cls.routine)
         return  cls.__init__()
 
 
@@ -545,8 +554,9 @@ class GenericRequest():
             safi.core.Request: Instancia Request lista para ejecutar.
         """
         raw_parameters=[]
+        #print(kwargs)
         non_empty={k: v for k, v in kwargs.items() if v}
-        print(self.properties[0])
+        #print(self.properties[0])
         
         unpack=self.properties[0]
 
@@ -568,7 +578,14 @@ class GenericRequest():
         #print (raw_parameters)
         return self
 
-   
+    @property
+    def request(self):
+        return self._request
+
+    @request.setter
+    def request(self,value):
+        self._request = value
+    
 
     @property
     def keyword(self):
@@ -641,31 +658,49 @@ class GenericRequest():
 ############################################################################
 ############################################################################
 class Request():
+    class Generic(BaseRequest):
+        def __init__(self,routine,parameters=None):
+            super().__init__(keyword=None)
+            self._routine=routine
+            self.parameters=parameters
 
-    class Account(GenericRequest):
-        def __init__(self,keyword):
-            super().__init__(keyword)
-            repository=Repository.Account
-            self.properties=self.get_props(keyword,repository)
+    class Account(BaseRequest):
+        def __init__(self,keyword,repository=None):
+            super().__init__(keyword,repository)
+        # def __init__(self,keyword):
+        #     super().__init__(keyword)
+        #     repository=Repository.Account
+        #     self.properties=self.get_props(keyword,repository)
 
-    class Integracion(GenericRequest):
-        def __init__(self,keyword):
-            super().__init__(keyword)
-            repository=Repository.Integracion
-            self.properties=self.get_props(keyword,repository)
+    class Integracion(BaseRequest):
+        def __init__(self,keyword,repository=None):
+            super().__init__(keyword,repository)
+        # def __init__(self,keyword):
+        #     super().__init__(keyword)
+        #     self_name=__class__.__name__
+        #     repository=getattr(Repository, self_name) #The class name  must be equal to List  propertie
+        #     print(repository)
+        #     self.properties=self.get_props(keyword,repository)
 
-    class Cartera(GenericRequest):
-        def __init__(self,keyword):
-            super().__init__(keyword)
-            repository=Repository.Cartera
-            self.properties=self.get_props(keyword,repository)
-    class Catalogos(GenericRequest):
-        def __init__(self,keyword):
-            super().__init__(keyword)
-            repository=Repository.Catalogos
-            self.properties=self.get_props(keyword,repository)
+    class Cartera(BaseRequest):
+        def __init__(self,keyword,repository=None):
+            super().__init__(keyword,repository)
+            # self_name=__class__.__name__
+            # repository=getattr(Repository, self_name) #The class name  must be equal to List  propertie
+            # print(repository)
+            # self.properties=self.get_props(keyword,repository)
+    
+    class Catalogos(BaseRequest):
+        def __init__(self,keyword,repository=None):
+            super().__init__(keyword,repository)
+        # def __init__(self,keyword,repository):
+        #     super().__init__()
+        #     repository=Repository.Catalogos
+        #     self.properties=self.get_props(keyword,repository)
 
-    class Bulk(GenericRequest):
+    class GenericBulk(BaseRequest):
+        
+    class Bulk(BaseRequest):
         
         @property
         def source(self):
@@ -678,13 +713,12 @@ class Request():
         
         def __init__(self, keyword,datasource):
             super().__init__(keyword)
-            repository=Repository.Bulk
-            self.properties=self.get_props(keyword,repository)
-            print(self.properties)
+            #repository=Repository.Bulk
+            #self.properties=self.get_props(keyword,repository)
             self._source=datasource
 
             
-        def parse(self,**kwargs):
+        def map(self,**kwargs):
             '''
             
             Mapea cada parametro <Key> de Kwargs con  el valor correspondiente del <value> (como key)
@@ -700,6 +734,7 @@ class Request():
             #parameter_properties=unpack['parameters']
             #print (self._source)
             list_request=[]
+            #print(self._source) # lista de Lote
             for row in self._source:
                 #print (row)
                 #for par in kwargs:
@@ -714,7 +749,7 @@ class Request():
                 
                 #print ("add_args", add_args)
                 #request_item=self.add(**add_args)
-                request_item=self.__class__(self._request,self._source)
+                request_item=self.__class__(self._keyword,self._source)
                 r=request_item.add(**add_args)
                 #print(type(r))
             
@@ -737,7 +772,7 @@ class Request():
             
             return (list_request)
 
-    class _BulkParsedRequest(GenericRequest):
+    class _BulkParsedRequest(BaseRequest):
         def __init__(self,keyword):
             super().__init__(keyword)
             repository=Repository.Bulk
@@ -761,9 +796,9 @@ class Utils:
     def upper_keys(dataset):
         if isinstance(dataset, list):
             data=dataset[0]
-            print (data)
+            #print (data)
             data = {k.upper():v for k,v in data.items()}
-            print (data)
+            #print (data)
             dataset[0]=(data)
         print (data)
         return dataset
@@ -787,7 +822,7 @@ class Utils:
         for item in row_iterator:
             data.append(item)
             if(len(data)>=limit):
-                print("-"*10)
+                print(" = "*10)
                 row_list=data
                 data=[]
                 yield row_list
@@ -929,9 +964,17 @@ class Utils:
         return settings
 
 class Output():
-    def _update(self,db_output,request):
-        
-        self._rowcount=(len(db_output))
+    def __init__(self,db_output,request):
+        if db_output:
+            self._update(db_output,request)
+
+
+    def _update(self,db_output,request): 
+        if isinstance(db_output,list):
+            self._rowcount=(len(db_output))
+            self._columns=((db_output[0].keys()))
+
+        self._data=db_output
         self._code=0
         
         if request.output=='message' and  self._rowcount==1 :
@@ -940,12 +983,32 @@ class Output():
         if self._rowcount>0:
             self._message='Consulta realizada correctamente'
         else:
-            #request.status_code=1
             self._message='No Existen resultados.'
    
         if "NUMERR" in db_output[0]:
             self._code=db_output[0]['NUMERR']
             self._message=db_output[0]['ERRMEN']
+    
+
+    def to_json(self):
+        data_json=[]
+        data=self.data
+        for row in data:
+            json_str = json.dumps(row,cls=Generic.CustomJsonEncoder)
+            data_json.append(json_str)
+        
+        return data_json
+
+    def to_onlydata(self):
+        '''
+        Devuelve el resultset en formato de lista sin encabezados.
+        '''
+        data_no_headers=[]
+        data=self.data
+        for row in data:
+            data_no_headers.append( [i for i in row.values()])
+        return data_no_headers
+        
 
 
     @property
@@ -976,9 +1039,13 @@ class Output():
     def data(self,value):
         self._data=value
     
-    def __init__(self,db_output,request):
-        self._data=db_output
-        self._update(request,db_output)
+    @property
+    def columns(self):
+        return self._columns
+    @columns.setter
+    def columns(self,value):
+        self._columns=value
+    
 
             
 
