@@ -1,12 +1,9 @@
 from .database import Repository
 from distutils.log import debug
-#from email import message
-#from sqlite3 import DatabaseError
+
 from sre_constants import SUCCESS
 import mysql.connector
 from mysql.connector import errorcode
-
-#import sqlite3
 import json
 import configparser
 
@@ -75,7 +72,7 @@ class Session():
 
 
         else:
-            raise Exception.DataBaseError(self.db_name,err)  
+            raise Exception.DataBaseError(self.db_uri,err)  
             pass
 
     @property
@@ -227,41 +224,7 @@ class Session():
             return True
         else:
             return False
-        
     
-    def get_updates(self,type):
-        #type=kwargs.pop('type')
-        args=list()
-        args.append(1)
-        API_ENDPOINT='http://localhost:8000/bodesa/api/saldosdetalle/'
-        last_id=self.service.get(LAST_TRASACCTION_ID)
-        logger.info("Ultima transaccion: " + str(last_id))
-        #cursor.execute('SELECT * from USUARIOS')
-        db=self.connect()
-        cursor=db.cursor(dictionary=True)
-        cursor.execute("call PGS_MAESTROSALDOS('I','T',556,'S') ") 
-        result=cursor.fetchall()
-        for row in result:
-            app_json = json.dumps(row,cls=Utils.CustomJsonEncoder)
-            #print(app_json)
-
-            r = requests.post(url = API_ENDPOINT, data = app_json,headers=self.REQUESTS_HEADER)
-            #print(r.status_code)
-
-    def _update_request(self,request,raw_data):
-        request.rowcount=(len(raw_data))
-        if request.rowcount>0:
-            request.status_code=0
-            request.status_message='Consulta realizada correctamente'
-        else:
-            request.status_code=1
-            request.status_message='No Existen resultados'
-   
-        if "NumErr" in raw_data[0]:
-            request.status_code=raw_data[0]['NumErr']
-            request.status_message=raw_data[0]['ErrMen']
-
-
         
     def _run(self,routine,params,request=None):
         '''Devuelve un objeto Cursor'''
@@ -298,7 +261,8 @@ class Session():
             #         print(raw_data)
 
 
-        #db.commit()
+                db.commit()
+                db.close()
 
                 #raw_data=results.fetchall()
                 #print(rows)
@@ -362,7 +326,7 @@ class Session():
         db_connection=None
         if isinstance(self,Connector):
             try:
-                db_connection=mysql.connector.connect(**self.db_strcon)
+                db_connection=mysql.connector.connect(**self.db_strcon,pool_size=32)
                 #print(message)
                 #print('try')
 
@@ -413,13 +377,13 @@ class Engine(Session):
         self.__db_conname=connection_name
 
 
-    def connect(self):
-        '''
-        Devuelve un objeto de  conexión con la Base de datos
-        '''
-        db_connection=connections[connection_name]
-        success_connection=True
-        return db_connection #success_connection
+    # def connect(self):
+    #     '''
+    #     Devuelve un objeto de  conexión con la Base de datos
+    #     '''
+    #     db_connection=connections[self.__db_conname]
+    #     success_connection=True
+    #     return db_connection #success_connection
 
     
 class Connector(Session):
@@ -443,25 +407,25 @@ class Connector(Session):
                                     database=self.db_name,
                                     port=self.db_port)
 
-    def connect(self):
-        try:
-            db_connection=mysql.connector.connect(**self.db_strcon)
-            message="MySQL: Database connection is open."
-            success_connection=True
+    # def connect(self):
+    #     try:
+    #         db_connection=mysql.connector.connect(**self.db_strcon)
+    #         message="MySQL: Database connection is open."
+    #         success_connection=True
 
-        except mysql.connector.Error as err:
-            if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-                message="MySQL: Authentication failed, wrong username or password"
-            elif err.errno == errorcode.ER_BAD_DB_ERROR:
-                message="MySQL: The database [" +  self.db_name +  "] don't exists"
-            else:
-                message=err
-            logger.error(message)
-            return None
-        else:
-            #     db_connection.close()
-                logger.info(message)
-        return db_connection #success_connection
+    #     except mysql.connector.Error as err:
+    #         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+    #             message="MySQL: Authentication failed, wrong username or password"
+    #         elif err.errno == errorcode.ER_BAD_DB_ERROR:
+    #             message="MySQL: The database [" +  self.db_name +  "] don't exists"
+    #         else:
+    #             message=err
+    #         logger.error(message)
+    #         return None
+    #     else:
+    #         #     db_connection.close()
+    #             logger.info(message)
+    #     return db_connection #success_connection
         
 
 ############################################################################
@@ -512,36 +476,36 @@ class BaseRequest():
         #print(repository)
         return [element for element in repository if element['keyword'] == keyword]
     
-    def add_bulk(self,**kwargs):
-        class ParsedRequest():
-            @property
-            def parameters(self):
-                return self._parameters
+    # def add_bulk(self,**kwargs):
+    #     class ParsedRequest():
+    #         @property
+    #         def parameters(self):
+    #             return self._parameters
             
-            @parameters.setter
-            def parameters(self,value):
-                self._parameters = value
+    #         @parameters.setter
+    #         def parameters(self,value):
+    #             self._parameters = value
                 
-            @property
-            def routine(self):
-                return self._routine
+    #         @property
+    #         def routine(self):
+    #             return self._routine
             
-            @routine.setter
-            def routine(self,value):
-                self.routine = value
-            def __init__(self,outer,**kwargs):
-                self._parameters=kwargs
-                self._routine=outer.routine
-                pass
-            pass
+    #         @routine.setter
+    #         def routine(self,value):
+    #             self.routine = value
+    #         def __init__(self,outer,**kwargs):
+    #             self._parameters=kwargs
+    #             self._routine=outer.routine
+    #             pass
+    #         pass
 
-        parsed=ParsedRequest(self,**kwargs)
-        return ParsedRequest
-    @classmethod    
-    def new(cls,**add_args):
-        #print(cls)
-        #print(cls.routine)
-        return  cls.__init__()
+    #     parsed=ParsedRequest(self,**kwargs)
+    #     return ParsedRequest
+    # @classmethod    
+    # def new(cls,**add_args):
+    #     #print(cls)
+    #     #print(cls.routine)
+    #     return  cls.__init__()
 
 
     def add(self,**kwargs):
@@ -698,9 +662,14 @@ class Request():
         #     repository=Repository.Catalogos
         #     self.properties=self.get_props(keyword,repository)
 
-    class GenericBulk(BaseRequest):
+    
+    class BaseBulk(BaseRequest):
         
-    class Bulk(BaseRequest):
+        def __init__(self, keyword,datasource,repository=None):
+            super().__init__(keyword)
+            #repository=Repository.Bulk
+            #self.properties=self.get_props(keyword,repository)
+            self._source=datasource
         
         @property
         def source(self):
@@ -711,11 +680,6 @@ class Request():
             self._source = value
         
         
-        def __init__(self, keyword,datasource):
-            super().__init__(keyword)
-            #repository=Repository.Bulk
-            #self.properties=self.get_props(keyword,repository)
-            self._source=datasource
 
             
         def map(self,**kwargs):
@@ -745,17 +709,13 @@ class Request():
                     if key_value==-1:
                         raise Exception ("No existe un elemento: <" + value + "> dentro de la colección, <" + key + "> no puede ser mapeado." );
                     #print('Key: ' + key +', value: ' + str(key_value))
-                    add_args[key]=key_value
-                
+                    add_args[key]=key_value                
                 #print ("add_args", add_args)
                 #request_item=self.add(**add_args)
                 request_item=self.__class__(self._keyword,self._source)
                 r=request_item.add(**add_args)
                 #print(type(r))
-            
-
-                #self._parameters=
-                
+                #self._parameters=                
                 #self._parameters=add_args
                 #request_item=self.add_bulk(**add_args)
                 #print(type(request_item))
@@ -765,12 +725,22 @@ class Request():
                 #print('objeto_instanciado:' + request_item.routine)
                 list_request.append(request_item)
                 #print ('items' + str(list_request.__len__()))
-
                 #value= kwargs.get(par['name'],par['default'])
                 #raw_parameters.append(value)
             #self._parameters= raw_parameters
             
             return (list_request)
+
+    class Bulk(BaseBulk):
+        def __init__(self, keyword, datasource):
+            super().__init__(keyword, datasource)
+        
+
+    class GenericBulk(BaseBulk):
+        def __init__(self, keyword, datasource,repository):
+            super().__init__(keyword, datasource,repository)
+        
+
 
     class _BulkParsedRequest(BaseRequest):
         def __init__(self,keyword):

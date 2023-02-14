@@ -36,10 +36,14 @@ def main():
         cfg=Utils.load_settings('pgss.cfg')
         print(cfg)
         
-        cfg={'dbuser': 'root', 'dbname': 'migracionProgressa', 'dbpassword': 'Vostro1310', 'dbhost': 'localhost', 'dbport': '3306'}
+        cfg={'dbuser': 'root', 'dbname': 'migracionProgressa', 'dbpassword': 'Vostro1310', 'dbhost': 'localhost', 'dbport': '3308'}
         safi=Connector(**cfg)
         vencimientos=Request.Cartera('vencimientos').add(FechaInicio='2022-09-01',FechaFin='2022-09-01')
-        creditos=Request.Cartera('update',update).add()
+        resultados=safi.get(vencimientos)
+        print(resultados)
+
+        #creditos=Request.Cartera('update',update).add()
+
 
 
 
