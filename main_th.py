@@ -5,30 +5,29 @@ from datetime import datetime
 import logging
 from multiprocessing import Process,Pool
 import asyncio
-from multiprocessing import Pool
+#from multiprocessing import Pool
 settings=Utils.load_settings('pgss.cfg')    
 
 def task(requests):
-    print(f'task is running')
     db=Connector(**settings)
     result=db.get(requests)
-    print(result.data)
-    return result
+    return [result.data]
 
-
+def progress(results):
+    print('*', end='', flush=True)
 
 
 
 
 def main():
-    POOL_SIZE=4
+    POOL_SIZE=10
     settings=Utils.load_settings('pgss.cfg')    
 
     db=Connector(**settings)
 
     if db.is_available :
         vencimientos=Request.Cartera('vencimientos').add(FechaInicio='2022-10-10',FechaFin='2022-10-20',AtrasoInicial=1,AtrasoFinal=99999)
-        
+        results=[]
         data=db.get(vencimientos)
         #dataset=safi.Utils.to_csv(data,**kwargs)
         if(data):                       
@@ -39,7 +38,12 @@ def main():
                 request_list=Request.Bulk('pago-credito',row).map(CreditoID='CreditoID', MontoPagar='Pago',CuentaID='CuentaID')
 
                 with Pool(4) as pool:
-                    r = set(pool.map(task, request_list))
+                    results.append(pool.map_async(task, request_list,chunksize=1,callback=progress))
+                    pool.close()
+                    pool.join()
+            print(' Done.')
+            for result in results:
+                print(result.get())
 
 if __name__ == '__main__':
     main()
@@ -65,3 +69,4 @@ if __name__ == '__main__':
 
 
 
+#9:20

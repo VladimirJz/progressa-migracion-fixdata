@@ -253,6 +253,7 @@ class Session():
                     #print (raw_data)
                     raw_data=results.fetchall()
                     
+                    
            # ORIGINAL
             # with db.cursor() as cursor:  
             #     cursor.callproc(routine,params)    
@@ -260,8 +261,8 @@ class Session():
             #         raw_data=result
             #         print(raw_data)
 
-
-                db.commit()
+                
+                #db.commit()
                 db.close()
 
                 #raw_data=results.fetchall()
@@ -293,6 +294,7 @@ class Session():
                 message="MySQL: The database is available"
                 #print(message)
                 success_connection= True
+                db_connection.close()
                 #print('try')
 
             except mysql.connector.Error as err:
@@ -314,6 +316,7 @@ class Session():
             # The django manage the connection
             #logger.info(message)
             success_connection=True
+            
 
         return success_connection
 
@@ -326,7 +329,7 @@ class Session():
         db_connection=None
         if isinstance(self,Connector):
             try:
-                db_connection=mysql.connector.connect(**self.db_strcon,pool_size=32)
+                db_connection=mysql.connector.connect(**self.db_strcon,conn_attrs= {"_client_name": "SAFI.CORE.API","_source_host":"develop_test"}  )#,pool_size=32
                 #print(message)
                 #print('try')
 
@@ -454,10 +457,13 @@ class BaseRequest():
         #self_name=__class__.__name__
         self_name=self.__class__.__name__
 
-        if  not isinstance(self,Request.Generic):    
+        if  not isinstance(self,Request.Generic) and not isinstance(self,Request.GenericBulk):    
             if(repository==None ):
                 repository=getattr(Repository, self_name) #The class name  must be equal to List  propertie
-            self.properties=self.get_props(keyword,repository)
+        if not isinstance(self,Request.Generic):
+            self._properties=self.get_props(keyword,repository)
+
+        self._repository=repository
     
     def get_props(self,keyword, repository):
         """ Obtiene los propiedades de la petición <keyword> solicitada y actualiza las propiedades
@@ -521,8 +527,10 @@ class BaseRequest():
         #print(kwargs)
         non_empty={k: v for k, v in kwargs.items() if v}
         #print(self.properties[0])
-        
-        unpack=self.properties[0]
+        # if len(self._properties)==0:
+        #     unpack=self._properties
+        # else:
+        unpack=self._properties[0]
 
         self._routine=unpack['routine']
         self._output=unpack['output']
@@ -550,6 +558,14 @@ class BaseRequest():
     def request(self,value):
         self._request = value
     
+    @property
+    def repository(self):
+        return self._repository
+    
+    @repository.setter
+    def repository(self,value):
+        self._repository = value
+
 
     @property
     def keyword(self):
@@ -666,7 +682,7 @@ class Request():
     class BaseBulk(BaseRequest):
         
         def __init__(self, keyword,datasource,repository=None):
-            super().__init__(keyword)
+            super().__init__(keyword,repository)
             #repository=Repository.Bulk
             #self.properties=self.get_props(keyword,repository)
             self._source=datasource
@@ -712,7 +728,10 @@ class Request():
                     add_args[key]=key_value                
                 #print ("add_args", add_args)
                 #request_item=self.add(**add_args)
-                request_item=self.__class__(self._keyword,self._source)
+                if isinstance(self,Request.GenericBulk) or isinstance(self,Request.GenericBulk):
+                    request_item=self.__class__(self._keyword,self._source,self._repository)
+                else:
+                    request_item=self.__class__(self._keyword,self._source)
                 r=request_item.add(**add_args)
                 #print(type(r))
                 #self._parameters=                
@@ -770,7 +789,7 @@ class Utils:
             data = {k.upper():v for k,v in data.items()}
             #print (data)
             dataset[0]=(data)
-        print (data)
+        #print (data)
         return dataset
 
     
@@ -792,7 +811,7 @@ class Utils:
         for item in row_iterator:
             data.append(item)
             if(len(data)>=limit):
-                print(" = "*10)
+                #print(" = "*10)
                 row_list=data
                 data=[]
                 yield row_list
@@ -929,12 +948,13 @@ class Utils:
             #sys.exit()
 
 
-        print(settings)
+        #print(settings)
 
         return settings
 
 class Output():
     def __init__(self,db_output,request):
+        self._data=''
         if db_output:
             self._update(db_output,request)
 
@@ -1106,7 +1126,9 @@ class Exception(BaseException):
         def __init__(self, object=None, *args):
             super().__init__(args)
             self.object = object
-            self.message=args[0]
-
+            if(args):
+                self.message=args[0]
+            else:
+                self.message='ERROR'
         def __str__(self):
             return f" { self.message }:'{ self.object }'."
