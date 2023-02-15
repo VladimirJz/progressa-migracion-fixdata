@@ -40,9 +40,10 @@ def progress(n):
 
 def main():
 
-    print(datetime.now())
+    print(f'Hora de inicio:{datetime.now()}')
+    inicio=datetime.now()
     POOL_SIZE=40
-
+    NUM_THREADS=16
     #cfg=Utils.load_settings('pgss.cfg')
     #print(cfg)
 
@@ -51,22 +52,36 @@ def main():
     creditos_con_error=Request.Generic('PGSSALDOSAMORTIPRO',parameters)
     results=[]
     data=safi.get(creditos_con_error)    
-    print('Creditos por procesar:' + str(data.rowcount))    
+    
+    filas=len(data.data)
+    print('Creditos por Procesar:' + str(len(data.data)))   
 
     if(data):                       
-            data_block=Utils.paginate(data.data,POOL_SIZE)
+            block_generator=Utils.paginate(data.data,POOL_SIZE)
             n=0
+            r=0
+            item=0
             request_list=[]
-            for row in data_block:
-                request_list=Request.GenericBulk('update',row,update_repo).map(CreditoID='CreditoID',FechaCorte='FechaCorte')
-                print(len(request_list))
-                with Pool(8) as pool:
-                    n= n + POOL_SIZE
-                    results.append(pool.map(task, request_list,chunksize=5))
-                    #pool.close() # for async
-                    #pool.join() # for async 
-            print(' Done.')
-            print(datetime.now())
+            for data_block in block_generator: 
+                item=item+1 
+                for datarow in data_block :
+                    r=r+1
+                request_list=Request.GenericBulk('update',data_block,update_repo).map(CreditoID='CreditoID',FechaCorte='FechaCorte')
+
+                with Pool(NUM_THREADS) as pool:
+                    n= n + len(request_list)
+                    results.append(pool.map_async(task, request_list,chunksize=4, callback=progress(n)))
+                    pool.close() # for async
+                    pool.join() # for async 
+            
+            print('Registros:' + str(data.rowcount)) 
+            print(f'Loops procesados: { item } ')
+            print(f'items procesados: { r } ')
+            print(' \n.')
+    
+    fin=datetime.now()
+    duracion=inicio-fin
+    print('Duration: {}'.format(fin - inicio))
 
 
 

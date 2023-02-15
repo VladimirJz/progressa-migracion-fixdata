@@ -73,7 +73,7 @@ class Session():
 
         else:
             raise Exception.DataBaseError(self.db_uri,err)  
-            pass
+            
 
     @property
     def db_name(self):
@@ -269,6 +269,9 @@ class Session():
                 #print(rows)
                 #print('tupoCursor:',rows)
         except mysql.connector.Error as err:
+            # print('=' * 20) 
+            # print(routine)
+            # print(params)
             self._error_handler(err,routine)
             return None
         else: 
@@ -329,7 +332,7 @@ class Session():
         db_connection=None
         if isinstance(self,Connector):
             try:
-                db_connection=mysql.connector.connect(**self.db_strcon,conn_attrs= {"_client_name": "SAFI.CORE.API","_source_host":"develop_test"}  )#,pool_size=32
+                db_connection=mysql.connector.connect(**self.db_strcon,conn_attrs= {"_client_name": "SAFI.CORE.API","_source_host":"develop_test"} ,autocommit=False )#,pool_size=32
                 #print(message)
                 #print('try')
 
@@ -799,7 +802,8 @@ class Utils:
         '''
         Return a generator as a data subset by paginate a iterable object on set's of <limit> items using a lazy iterator.
         '''
-        
+        all_items=len(dataset)
+        items=0
         def _yield_row(dataset):                
            # i=0
             for row in dataset:
@@ -810,8 +814,16 @@ class Utils:
         row_iterator=_yield_row(dataset)
         for item in row_iterator:
             data.append(item)
+            items=items +1 
             if(len(data)>=limit):
                 #print(" = "*10)
+                row_list=data
+                data=[]
+                yield row_list
+            elif items == all_items:
+                #print('ultima:')
+                #print(len(row_list))
+                #print(f'{all_items} todos')
                 row_list=data
                 data=[]
                 yield row_list
