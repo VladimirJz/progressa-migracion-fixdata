@@ -1,6 +1,5 @@
 import sys
 from  safi.core import Connector,Request,Utils
-from safi import keywords as key
 #from  os import path
 from datetime import datetime
 from decimal import Decimal
@@ -13,8 +12,6 @@ import time
 #settings=Utils.load_settings('pgss.cfg')    
 
 
-key.CLIENTES
-
 update_repo=[
 	{'routine':'PGSSALDOSAMORTICRE',
 		'keyword':'update',
@@ -26,8 +23,8 @@ update_repo=[
 				]
 		},
             ]
-cfg={'dbuser': 'app', 'dbname': 'migracionProgressa', 'dbpassword': 'Vostro1310', 'dbhost': 'localhost', 'dbport': '3306'}
-cfg['program_name']='Migracion_SAFI'
+cfg={'dbuser': 'app', 'dbname': 'microfin', 'dbpassword': 'Vostro1310', 'dbhost': 'localhost', 'dbport': '3306'}
+cfg['program_name']='simulador_PAGOS'
 def task(requests):
     db=Connector(**cfg)
     result=db.get(requests)
@@ -52,13 +49,14 @@ def main():
 
     safi=Connector(**cfg)
     parameters=['2022-11-30',False,'N']
-    creditos_con_error=Request.Generic('PGSSALDOSAMORTIPRO',parameters)
+    vencimientos=Request.Cartera('vencimientos').add(FechaInicio='2022-10-10',FechaFin='2022-10-20',AtrasoInicial=1,AtrasoFinal=99999)
+
     results=[]
-    data=safi.get(creditos_con_error)    
+    data=safi.get(vencimientos)    
     
     filas=len(data.data)
     print('Creditos por Procesar:' + str(len(data.data)))   
-
+    #print (data.data)
     if(data):                       
             block_generator=Utils.paginate(data.data,POOL_SIZE)
             n=0
@@ -69,13 +67,14 @@ def main():
                 item=item+1 
                 for datarow in data_block :
                     r=r+1
-                request_list=Request.BaseBulk('update',data_block,update_repo).map(CreditoID='CreditoID',FechaCorte='FechaCorte')
-                #request_list=Request.Bulk('deposito',data_block).map(CuentaAhoID='CuentaID', CantidadMov='Pago',Par_Fecha='FechaEmision',Par_FechaAplicacion='FechaEmision')
+                request_list=Request.Bulk('pago-credito',data_block).map(CreditoID='CreditoID', MontoPagar='Pago',CuentaID='CuentaID')
+                #request_list=Request.GenericBulk('update',data_block,update_repo).map(CreditoID='CreditoID',FechaCorte='FechaCorte')
+
 
 
                 with Pool(NUM_THREADS) as pool:
                     n= n + len(request_list)
-                    results.append(pool.map_async(task, request_list,chunksize=5, callback=progress(n)))
+                    results.append(pool.map_async(task, request_list,chunksize=8, callback=progress(n)))
                     pool.close() # for async
                     pool.join() # for async 
             

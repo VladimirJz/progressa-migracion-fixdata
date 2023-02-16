@@ -1,9 +1,7 @@
 from decimal import Decimal
 from datetime import date
 
-SALDOS_DIARIOS='saldos_diarios'
-CLIENTES='clientes_detalle'
-LINEA='linea_credito'
+
 
 class Repository():
     #Aliases
@@ -26,7 +24,7 @@ class Repository():
         'keyword':'cliente_detalle',
         'output':'table',
        'parameters':
-                [   {  'order':'1','name':'ClienteID','type':str,'default':'0','required':True},
+                [   { 'order':'1','name':'ClienteID','type':str,'default':'0','required':True},
                     {'order':'2','name':'Instrumento','type':str, 'default':"",'required':False},
                     {'order':'3','name':'OrigenID','type':'int', 'default':"",'required':False},            
                     {'order':'4','name':'Consolidado','type':str,'default':1, 'required':False},
@@ -234,6 +232,40 @@ class Repository():
                         {  'order':21, 'name':'ProgramaID', 'type':str, 'default':'API', 'required':False },
                         {  'order':22, 'name':'Sucursal', 'type':int, 'default':1, 'required':False },
                         {  'order':23, 'name':'Transaccion', 'type':int, 'default':1, 'required':False },
+                    ]
+            },
+            {'routine':'CARGOABONOCTAPRO',
+            'keyword':'deposito',
+            'output':'message',
+            'parameters':[{  'order':1, 'name':'CuentaAhoID', 'type': int, 'default':0, 'required':True },
+                        {  'order':2, 'name':'ClienteID', 'type':int, 'default':0, 'required':True },
+                        {  'order': 3, 'name':'NumeroMov', 'type':Decimal, 'default':1, 'required':True },
+                        {  'order': 4, 'name':'Fecha', 'type':str, 'default':'1900-01-01',   'required':False },
+                        {  'order': 5, 'name':'FechaAplicacion', 'type':str, 'default':'1900-01-01','required':False },
+                        {  'order':6, 'name':'NatMovimiento', 'type':str, 'default':'A','required':False },
+                        {  'order':7, 'name':'CantidadMov', 'type':int, 'default':0,'required':False },
+                        {  'order':8, 'name':'DescripcionMov', 'type':str, 'default':'DESPOSITO DE EFECTIVO', 'required':False },
+                        {  'order':9, 'name':'ReferenciaMov', 'type':str, 'default':'00000000', 'required':False },
+                        {  'order':10, 'name':'TipoMovAhoID', 'type':Decimal, 'default':28, 'required':False},
+                        {  'order':11, 'name':'MonedaID', 'type':int, 'default':1, 'required':False },
+                        {  'order':12, 'name':'SucCliente', 'type':int, 'default':1, 'required':False },
+                        {  'order':13, 'name':'AltaEncPoliza', 'type':int, 'default':'S', 'required':False },
+                        {  'order':14, 'name':'ConceptoCon', 'type':int, 'default':1, 'required':False },
+                        {  'order':15, 'name':'Poliza', 'type':str, 'default':0, 'required':False },
+                        {  'order':16, 'name':'AltaPoliza', 'type':str, 'default':'S', 'required':False }, 
+                        {  'order':17, 'name':'ConceptoAho', 'type':str, 'default':1, 'required':False },
+                        {  'order':18, 'name':'NatConta', 'type':int, 'default':'C', 'required':False },
+                        {  'order':19, 'name':'Salida', 'type':str, 'default':'S', 'required':False },            
+                        {  'order':20, 'name':'NumErr', 'type':str, 'default':0, 'required':False },
+                        {  'order':21, 'name':'ErrMen', 'type':str, 'default':"", 'required':False },
+                        {  'order':22, 'name':'Consecutivo', 'type':int, 'default':1, 'required':False },
+                        {  'order':23, 'name':'EmpresaID', 'type':int, 'default':1, 'required':False },
+                        {  'order':23, 'name':'Usuario', 'type':int, 'default':1, 'required':False },
+                        {  'order':23, 'name':'FechaActual', 'type':int, 'default':'1900-01-01', 'required':False },
+                        {  'order':23, 'name':'DireccionIP', 'type':int, 'default':'127.0.01', 'required':False },
+                        {  'order':23, 'name':'ProgramaID', 'type':int, 'default':1, 'required':False },
+                        {  'order':23, 'name':'Sucursal', 'type':int, 'default':1, 'required':False },
+                        {  'order':23, 'name':'NumTransaccion', 'type':int, 'default':1, 'required':False },
                     ]
             },
             ]
