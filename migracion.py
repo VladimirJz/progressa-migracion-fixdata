@@ -24,6 +24,7 @@ update_repo=[
 		},
             ]
 cfg={'dbuser': 'app', 'dbname': 'migracionProgressa', 'dbpassword': 'Vostro1310', 'dbhost': 'localhost', 'dbport': '3306'}
+cfg['program_name']='Migracion_serialized'
 
 def task(requests):
     db=Connector(**cfg)
@@ -41,7 +42,10 @@ def progress(n):
 def main():
 
     print(datetime.now())
+    inicio=datetime.now()
+
     POOL_SIZE=40
+    NUM_THREADS=8
 
     #cfg=Utils.load_settings('pgss.cfg')
     #print(cfg)
@@ -56,18 +60,27 @@ def main():
     if(data):                       
             data_block=Utils.paginate(data.data,POOL_SIZE)
             n=0
+            r=0
+            item=0
             request_list=[]
             for row in data_block:
+                item=item+1
                 request_list=Request.GenericBulk('update',row,update_repo).map(CreditoID='CreditoID',FechaCorte='FechaCorte')
                 print(len(request_list))
-                with Pool(8) as pool:
+                with Pool(NUM_THREADS) as pool:
                     n= n + POOL_SIZE
                     results.append(pool.map(task, request_list,chunksize=5))
                     #pool.close() # for async
                     #pool.join() # for async 
+            print('Registros:' + str(data.rowcount)) 
+            print(f'Loops procesados: { item } ')
+            print(f'items procesados: { r } ')
+            print(' \n.')
             print(' Done.')
             print(datetime.now())
-
+    fin=datetime.now()
+    duracion=inicio-fin
+    print('Duration: {}'.format(fin - inicio))
 
 
 if __name__ == '__main__':

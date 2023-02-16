@@ -24,7 +24,7 @@ update_repo=[
 		},
             ]
 cfg={'dbuser': 'app', 'dbname': 'migracionProgressa', 'dbpassword': 'Vostro1310', 'dbhost': 'localhost', 'dbport': '3306'}
-
+cfg['program_name']='Migracion_serialized'
 def task(requests):
     db=Connector(**cfg)
     result=db.get(requests)

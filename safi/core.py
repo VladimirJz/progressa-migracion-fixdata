@@ -74,7 +74,7 @@ class Session():
         else:
             raise Exception.DataBaseError(self.db_uri,err)  
             
-
+    #Conexion
     @property
     def db_name(self):
         return self._db_name
@@ -124,12 +124,22 @@ class Session():
     def db_uri(self,value):
         self._db_uri=value
 
+    #Status
     @property
     def is_available(self):
         return self._is_available
     @is_available.setter
     def is_available(self,value):
         self._is_available=value
+    
+    #Information
+    @property
+    def program_name(self):
+        return self._program_name
+    @program_name.setter
+    def program_name(self,value):
+        self._program_name=value
+
 
     # TODO: Renombrar el metodo get por un mas generico
     # la funcion ejecuta y lee el resultado.
@@ -332,7 +342,7 @@ class Session():
         db_connection=None
         if isinstance(self,Connector):
             try:
-                db_connection=mysql.connector.connect(**self.db_strcon,conn_attrs= {"_client_name": "SAFI.CORE.API","_source_host":"develop_test"} ,autocommit=False )#,pool_size=32
+                db_connection=mysql.connector.connect(**self.db_strcon, conn_attrs= {"client_name": "SAFI.CORE.API","source_host":"develop_test","program_name":self._program_name} ,autocommit=False )#,pool_size=32
                 #print(message)
                 #print('try')
 
@@ -395,11 +405,15 @@ class Engine(Session):
 class Connector(Session):
     def __init__(self,**kwargs):
         super().__init__()
+        print(kwargs)
         self.db_name=kwargs.pop('dbname')
         self.db_user=kwargs.pop('dbuser')
         self.db_pass=kwargs.pop('dbpassword')
         self.db_host=kwargs.pop('dbhost')
         self.db_port=kwargs.pop('dbport')
+        self._program_name=kwargs.pop('program_name')
+
+
         self._set_URI()
         #self.db_strcon=self._set_strconx()
 
@@ -785,7 +799,7 @@ class Utils:
         #s = sub(r"(_|-)+", " ", s).title().replace(" ", "")
         return ''.join([s[0].lower(), s[1:]])
 
-    def upper_keys(dataset):
+    def _upper_keys(dataset):
         if isinstance(dataset, list):
             data=dataset[0]
             #print (data)
@@ -799,7 +813,16 @@ class Utils:
 
     
     def paginate(dataset,limit):
-        '''
+        """ Recibe un bloque de datos extensos y regresa un <Generador> (lazy iterator), iterable por bloques
+            de <limit> elementos.
+
+        Args:
+            dataset (list): Bloque de datos
+            limit (int): Número de items que devuelve cada iteración.
+
+        Yields:
+            list: Lista iterable con <limit> items.
+        """        '''
         Return a generator as a data subset by paginate a iterable object on set's of <limit> items using a lazy iterator.
         '''
         all_items=len(dataset)
@@ -980,7 +1003,7 @@ class Output():
         self._code=0
         
         if request.output=='message' and  self._rowcount==1 :
-            db_output=Utils.upper_keys(db_output) # byPass: mismatch case  for header titles.        
+            db_output=Utils._upper_keys(db_output) # byPass: mismatch case  for header titles.        
 
         if self._rowcount>0:
             self._message='Consulta realizada correctamente'
